@@ -86,6 +86,7 @@ if USE_MYPYC:
         # Designed to collect things that can't be compiled
         'mypyc_hacks.py',
         'interpreted_plugin.py',
+        '_contextlib.py',
 
         # Can't be compiled because they need to be runnable as scripts
         '__main__.py',

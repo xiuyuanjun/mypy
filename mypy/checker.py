@@ -2,7 +2,7 @@
 
 import itertools
 import fnmatch
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 
 from typing import (
     Dict, Set, List, cast, Tuple, TypeVar, Union, Optional, NamedTuple, Iterator, Iterable,

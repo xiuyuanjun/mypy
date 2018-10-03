@@ -5,7 +5,7 @@ from typing import Callable, List, Optional, Set, Tuple, Iterator, TypeVar, Iter
 
 from itertools import chain
 
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 
 import itertools
 

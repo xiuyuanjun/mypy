@@ -32,7 +32,7 @@ TODO: Check if the third pass slows down type checking significantly.
   traverse the entire AST.
 """
 
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 
 from typing import (
     List, Dict, Set, Tuple, cast, TypeVar, Union, Optional, Callable, Iterator, Iterable,

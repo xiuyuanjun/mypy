@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 from typing import Optional, Tuple, Iterator
 STRICT_OPTIONAL = False
 find_occurrences = None  # type: Optional[Tuple[str, str]]

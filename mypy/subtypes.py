@@ -1,5 +1,5 @@
 from typing import List, Optional, Callable, Tuple, Iterator, Set, Union, cast
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 
 from mypy.types import (
     Type, AnyType, UnboundType, TypeVisitor, FormalArgument, NoneTyp, function_type,

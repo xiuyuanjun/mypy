@@ -1,7 +1,7 @@
 """Expression type checker. This file is conceptually part of TypeChecker."""
 
 from collections import OrderedDict
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 from typing import (
     cast, Dict, Set, List, Tuple, Callable, Union, Optional, Iterable,
     Sequence, Iterator

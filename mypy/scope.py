@@ -3,7 +3,7 @@
 TODO: Use everywhere where we track targets, including in mypy.errors.
 """
 
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 from typing import List, Optional, Iterator, Tuple
 
 from mypy.nodes import TypeInfo, FuncBase

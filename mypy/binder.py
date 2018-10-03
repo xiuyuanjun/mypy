@@ -1,5 +1,5 @@
 from typing import Dict, List, Set, Iterator, Union, Optional, Tuple, cast
-from contextlib import contextmanager
+from mypy.contextlib import contextmanager
 from collections import defaultdict
 
 MYPY = False
