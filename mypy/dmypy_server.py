@@ -385,6 +385,7 @@ class Server:
     def update_sources(self, sources: List[BuildSource]) -> None:
         paths = [source.path for source in sources if source.path is not None]
         self.fswatcher.add_watched_paths(paths)
+        self.fswatcher.watch_everything()
 
     def update_changed(self,
                        sources: List[BuildSource],

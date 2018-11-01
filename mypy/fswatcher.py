@@ -43,6 +43,11 @@ class FileSystemWatcher:
                 self._file_data[path] = None
         self._paths |= set(paths)
 
+    def watch_everything(self) -> None:
+        self._paths.update(self.fs.stat_cache)
+        self._paths.update(self.fs.stat_error_cache)
+        self._paths.update(self.fs.isfile_case_cache)
+
     def remove_watched_paths(self, paths: Iterable[str]) -> None:
         for path in paths:
             if path in self._file_data:
@@ -56,8 +61,9 @@ class FileSystemWatcher:
 
     def _find_changed(self, paths: Iterable[str]) -> AbstractSet[str]:
         changed = set()
+        print("Checking {} files for changes".format(len(paths)))
         for path in paths:
-            old = self._file_data[path]
+            old = self._file_data.get(path)
             try:
                 st = self.fs.stat(path)
             except FileNotFoundError:
