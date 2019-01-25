@@ -2090,8 +2090,13 @@ def find_module_simple(id: str, manager: BuildManager) -> Optional[str]:
     """Find a filesystem path for module `id` or `None` if not found."""
     t0 = time.time()
     x = manager.find_module_cache.find_module(id)
-    manager.add_stats(find_module_time=time.time() - t0, find_module_calls=1)
-
+    duration = time.time() - t0
+    manager.add_stats(find_module_time=duration, find_module_calls=1,
+                      find_module_hits=int(x is not None))
+    if x is None:
+        manager.add_stats(find_module_miss_time=duration)
+    else:
+        manager.add_stats(find_module_hit_time=duration)
     return x
 
 

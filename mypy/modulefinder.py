@@ -68,6 +68,8 @@ class FindModuleCache:
                  search_paths: SearchPaths,
                  fscache: Optional[FileSystemCache] = None,
                  options: Optional[Options] = None) -> None:
+#        print("SEARCH PATHS", search_paths)
+#        print(len(search_paths.python_path))
         self.search_paths = search_paths
         self.fscache = fscache or FileSystemCache()
         # Cache find_lib_path_dirs: (dir_chain, search_paths) -> list(package_dirs, should_verify)
@@ -125,8 +127,53 @@ class FindModuleCache:
                 self.ns_ancestors[pkg_id] = path
             path = os.path.dirname(path)
 
+    def check_base_dirs(self,
+                        id: str,
+                        components: List[str],
+                        candidate_base_dirs: PackageDirs,
+                        near_misses: List[str]) -> Optional[str]:
+        fscache = self.fscache
+
+        # If we're looking for a module like 'foo.bar.baz', then candidate_base_dirs now
+        # contains just the subdirectories 'foo/bar' that actually exist under the
+        # elements of lib_path.  This is probably much shorter than lib_path itself.
+        # Now just look for 'baz.pyi', 'baz/__init__.py', etc., inside those directories.
+        seplast = os.sep + components[-1]  # so e.g. '/baz'
+        sepinit = os.sep + '__init__'
+        for base_dir, verify in candidate_base_dirs:
+            base_path = base_dir + seplast  # so e.g. '/usr/lib/python3.4/foo/bar/baz'
+            # Prefer package over module, i.e. baz/__init__.py* over baz.py*.
+            for extension in PYTHON_EXTENSIONS:
+                path = base_path + sepinit + extension
+                path_stubs = base_path + '-stubs' + sepinit + extension
+                if fscache.isfile_case(path):
+                    if verify and not verify_module(fscache, id, path):
+                        near_misses.append(path)
+                        continue
+                    return path
+                elif fscache.isfile_case(path_stubs):
+                    if verify and not verify_module(fscache, id, path_stubs):
+                        near_misses.append(path_stubs)
+                        continue
+                    return path_stubs
+                elif self.options and self.options.namespace_packages and fscache.isdir(base_path):
+                    near_misses.append(base_path)
+            # No package, look for module.
+            for extension in PYTHON_EXTENSIONS:
+                path = base_path + extension
+                if fscache.isfile_case(path):
+                    if verify and not verify_module(fscache, id, path):
+                        near_misses.append(path)
+                        continue
+                    return path
+
+        return None
+
+
     def _find_module(self, id: str) -> Optional[str]:
         fscache = self.fscache
+
+        near_misses = []  # type: List[str]  # Collect near misses for namespace mode (see below).
 
         # If we're looking for a module like 'foo.bar.baz', it's likely that most of the
         # many elements of lib_path don't even have a subdirectory 'foo/bar'.  Discover
@@ -179,39 +226,11 @@ class FindModuleCache:
             third_party_stubs_dirs + third_party_inline_dirs + \
             self.find_lib_path_dirs(dir_chain, self.search_paths.typeshed_path)
 
-        # If we're looking for a module like 'foo.bar.baz', then candidate_base_dirs now
-        # contains just the subdirectories 'foo/bar' that actually exist under the
-        # elements of lib_path.  This is probably much shorter than lib_path itself.
-        # Now just look for 'baz.pyi', 'baz/__init__.py', etc., inside those directories.
-        seplast = os.sep + components[-1]  # so e.g. '/baz'
-        sepinit = os.sep + '__init__'
-        near_misses = []  # Collect near misses for namespace mode (see below).
-        for base_dir, verify in candidate_base_dirs:
-            base_path = base_dir + seplast  # so e.g. '/usr/lib/python3.4/foo/bar/baz'
-            # Prefer package over module, i.e. baz/__init__.py* over baz.py*.
-            for extension in PYTHON_EXTENSIONS:
-                path = base_path + sepinit + extension
-                path_stubs = base_path + '-stubs' + sepinit + extension
-                if fscache.isfile_case(path):
-                    if verify and not verify_module(fscache, id, path):
-                        near_misses.append(path)
-                        continue
-                    return path
-                elif fscache.isfile_case(path_stubs):
-                    if verify and not verify_module(fscache, id, path_stubs):
-                        near_misses.append(path_stubs)
-                        continue
-                    return path_stubs
-                elif self.options and self.options.namespace_packages and fscache.isdir(base_path):
-                    near_misses.append(base_path)
-            # No package, look for module.
-            for extension in PYTHON_EXTENSIONS:
-                path = base_path + extension
-                if fscache.isfile_case(path):
-                    if verify and not verify_module(fscache, id, path):
-                        near_misses.append(path)
-                        continue
-                    return path
+
+        # XXX
+        res = self.check_base_dirs(id, components, candidate_base_dirs, near_misses)
+        if res is not None:
+            return res
 
         # In namespace mode, re-check those entries that had 'verify'.
         # Assume search path entries xxx, yyy and zzz, and we're
