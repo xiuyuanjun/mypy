@@ -10,7 +10,7 @@ import os
 import subprocess
 import sys
 
-from typing import Dict, List, NamedTuple, Optional, Set, Tuple
+from typing import Dict, List, NamedTuple, Optional, Set, Tuple, Iterable
 
 MYPY = False
 if MYPY:
@@ -32,7 +32,7 @@ SearchPaths = NamedTuple(
 
 # Package dirs are a two-tuple of path to search and whether to verify the module
 OnePackageDir = Tuple[str, bool]
-PackageDirs = List[OnePackageDir]
+PackageDirs = Iterable[OnePackageDir]
 
 PYTHON_EXTENSIONS = ['.pyi', '.py']  # type: Final
 
@@ -73,36 +73,40 @@ class FindModuleCache:
         self.search_paths = search_paths
         self.fscache = fscache or FileSystemCache()
         # Cache find_lib_path_dirs: (dir_chain, search_paths) -> list(package_dirs, should_verify)
-        self.dirs = {}  # type: Dict[Tuple[str, Tuple[str, ...]], PackageDirs]
+        self.dirs = {}  # type: Dict[Tuple[str, Tuple[str, ...]], Tuple[int, List[OnePackageDir]]]
         # Cache find_module: id -> result
         self.results = {}  # type: Dict[str, Optional[str]]
         self.ns_ancestors = {}  # type: Dict[str, str]
         self.options = options
+        self.python_mypy_path = self.search_paths.mypy_path + self.search_paths.python_path
 
     def clear(self) -> None:
         self.results.clear()
-        self.dirs.clear()
+        #self.dirs.clear()
         self.ns_ancestors.clear()
 
-    def find_lib_path_dirs(self, dir_chain: str, lib_path: Tuple[str, ...]) -> PackageDirs:
-        # Cache some repeated work within distinct find_module calls: finding which
-        # elements of lib_path have even the subdirectory they'd need for the module
-        # to exist. This is shared among different module ids when they differ only
-        # in the last component.
-        # This is run for the python_path, mypy_path, and typeshed_path search paths
-        key = (dir_chain, lib_path)
-        if key not in self.dirs:
-            self.dirs[key] = self._find_lib_path_dirs(dir_chain, lib_path)
-        return self.dirs[key]
+    # def find_lib_path_dirs(self, dir_chain: str, lib_path: Tuple[str, ...]) -> PackageDirs:
+    #     # Cache some repeated work within distinct find_module calls: finding which
+    #     # elements of lib_path have even the subdirectory they'd need for the module
+    #     # to exist. This is shared among different module ids when they differ only
+    #     # in the last component.
+    #     # This is run for the python_path, mypy_path, and typeshed_path search paths
+    #     key = (dir_chain, lib_path)
+    #     if key not in self.dirs or True:
+    #         self.dirs[key] = self._find_lib_path_dirs(dir_chain, lib_path)
+    #     return self.dirs[key]
 
-    def _find_lib_path_dirs(self, dir_chain: str, lib_path: Tuple[str, ...]) -> PackageDirs:
-        dirs = []
+    def find_lib_path_dirs(self, dir_chain: str, lib_path: Tuple[str, ...]) -> PackageDirs:
+#        dirs = self.dirs.setdefault((dir_chain, lib_path), [])
+        # if dirs:
+        #     yield from dirs
         for pathitem in lib_path:
             # e.g., '/usr/lib/python3.4/foo/bar'
             dir = os.path.normpath(os.path.join(pathitem, dir_chain))
             if self.fscache.isdir(dir):
-                dirs.append((dir, True))
-        return dirs
+                yield (dir, True)
+                # dirs.append((dir, True))
+        #return dirs
 
     def find_module(self, id: str) -> Optional[str]:
         """Return the path of the module source file, or None if not found."""
@@ -171,6 +175,7 @@ class FindModuleCache:
 
 
     def _find_module(self, id: str) -> Optional[str]:
+#        print('REAL FIND MODULE')
         fscache = self.fscache
 
         near_misses = []  # type: List[str]  # Collect near misses for namespace mode (see below).
@@ -183,10 +188,19 @@ class FindModuleCache:
         dir_chain = os.sep.join(components[:-1])  # e.g., 'foo/bar'
         # TODO (ethanhs): refactor each path search to its own method with lru_cache
 
+        # Check the python and mypy paths before looking for third-party stuff
+
+        res = self.check_base_dirs(id, components,
+                                   self.find_lib_path_dirs(dir_chain, self.python_mypy_path),
+                                   near_misses)
+        if res is not None:
+            return res
+
+
         # We have two sets of folders so that we collect *all* stubs folders and
         # put them in the front of the search path
-        third_party_inline_dirs = []  # type: PackageDirs
-        third_party_stubs_dirs = []  # type: PackageDirs
+        third_party_inline_dirs = []  # type: List[OnePackageDir]
+        third_party_stubs_dirs = []  # type: List[OnePackageDir]
         # Third-party stub/typed packages
         for pkg_dir in self.search_paths.package_path:
             stub_name = components[0] + '-stubs'
@@ -221,16 +235,18 @@ class FindModuleCache:
             # Everything should be in fixtures.
             third_party_inline_dirs.clear()
             third_party_stubs_dirs.clear()
-        python_mypy_path = self.search_paths.mypy_path + self.search_paths.python_path
-        candidate_base_dirs = self.find_lib_path_dirs(dir_chain, python_mypy_path) + \
+#        print('LOL GOT HERE', len(components))
+        candidate_base_dirs = \
             third_party_stubs_dirs + third_party_inline_dirs + \
-            self.find_lib_path_dirs(dir_chain, self.search_paths.typeshed_path)
+            list(self.find_lib_path_dirs(dir_chain, self.search_paths.typeshed_path))
 
 
         # XXX
         res = self.check_base_dirs(id, components, candidate_base_dirs, near_misses)
         if res is not None:
+#            print('LOL GOT IT', id)
             return res
+#        print('LOL MISS', id)
 
         # In namespace mode, re-check those entries that had 'verify'.
         # Assume search path entries xxx, yyy and zzz, and we're
@@ -476,7 +492,7 @@ def compute_search_paths(sources: List[BuildSource],
                   file=sys.stderr)
             sys.exit(1)
 
-    return SearchPaths(tuple(reversed(python_path)),
+    return SearchPaths(tuple((python_path)),
                        tuple(mypypath),
                        tuple(egg_dirs + site_packages),
                        tuple(lib_path))
