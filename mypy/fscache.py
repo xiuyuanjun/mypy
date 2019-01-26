@@ -31,8 +31,10 @@ advantage of the benefits.
 import hashlib
 import os
 import stat
-from typing import Dict, List, Set
+from typing import Dict, List, Set, NamedTuple
 
+
+SimpleDirEntry = NamedTuple("SimpleDirEntry", [("is_file", bool), ("is_dir", bool)])
 
 class FileSystemCache:
     def __init__(self) -> None:
@@ -48,8 +50,8 @@ class FileSystemCache:
         """Start another transaction and empty all caches."""
         self.stat_cache = {}  # type: Dict[str, os.stat_result]
         self.stat_error_cache = {}  # type: Dict[str, OSError]
-        self.listdir_cache = {}  # type: Dict[str, List[str]]
-        self.listdir_error_cache = {}  # type: Dict[str, OSError]
+        self.scandir_cache = {}  # type: Dict[str, Dict[str, SimpleDirEntry]]
+        self.scandir_error_cache = {}  # type: Dict[str, OSError]
         self.isfile_case_cache = {}  # type: Dict[str, bool]
         self.read_cache = {}  # type: Dict[str, bytes]
         self.read_error_cache = {}  # type: Dict[str, Exception]
@@ -153,25 +155,29 @@ class FileSystemCache:
         return st
 
     def listdir(self, path: str) -> List[str]:
+        return list(self.scandir(path))
+
+    def scandir(self, path: str) -> Dict[str, SimpleDirEntry]:
         path = os.path.normpath(path)
-        if path in self.listdir_cache:
-            res = self.listdir_cache[path]
+        if path in self.scandir_cache:
+            res = self.scandir_cache[path]
             # Check the fake cache.
             if path in self.fake_package_cache and '__init__.py' not in res:
-                res.append('__init__.py')  # Updates the result as well as the cache
+                # Updates the result as well as the cache
+                res['__init__.py'] = SimpleDirEntry(True, False)
             return res
-        if path in self.listdir_error_cache:
-            raise copy_os_error(self.listdir_error_cache[path])
+        if path in self.scandir_error_cache:
+            raise copy_os_error(self.scandir_error_cache[path])
         try:
-            results = os.listdir(path)
+            results = {x.name: SimpleDirEntry(x.is_file(), x.is_dir()) for x in os.scandir(path)}
         except OSError as err:
             # Like above, take a copy to reduce memory use.
-            self.listdir_error_cache[path] = copy_os_error(err)
+            self.scandir_error_cache[path] = copy_os_error(err)
             raise err
-        self.listdir_cache[path] = results
+        self.scandir_cache[path] = results
         # Check the fake cache.
         if path in self.fake_package_cache and '__init__.py' not in results:
-            results.append('__init__.py')
+            results['__init__.py'] = SimpleDirEntry(True, False)
         return results
 
     def isfile(self, path: str) -> bool:
@@ -205,11 +211,13 @@ class FileSystemCache:
         return res
 
     def isdir(self, path: str) -> bool:
+        base, end = os.path.split(path)
         try:
-            st = self.stat(path)
+            contents = self.scandir(base)
         except OSError:
             return False
-        return stat.S_ISDIR(st.st_mode)
+        entry = contents.get(end)
+        return entry is not None and entry.is_dir
 
     def exists(self, path: str) -> bool:
         try:
