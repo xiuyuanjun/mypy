@@ -96,12 +96,17 @@ class FindModuleCache:
     #         self.dirs[key] = self._find_lib_path_dirs(dir_chain, lib_path)
     #     return self.dirs[key]
 
-    def find_lib_path_dirs(self, dir_chain: str, lib_path: Tuple[str, ...]) -> PackageDirs:
+    def find_lib_path_dirs(
+            self, components: List[str], dir_chain: str, lib_path: Tuple[str, ...]) -> PackageDirs:
 #        dirs = self.dirs.setdefault((dir_chain, lib_path), [])
         # if dirs:
         #     yield from dirs
         for pathitem in lib_path:
             # e.g., '/usr/lib/python3.4/foo/bar'
+            if len(components) > 2:
+                adir = os.path.normpath(os.path.join(pathitem, components[0]))
+                if not self.fscache.isdir(adir):
+                    continue
             dir = os.path.normpath(os.path.join(pathitem, dir_chain))
             if self.fscache.isdir(dir):
                 yield (dir, True)
@@ -191,7 +196,7 @@ class FindModuleCache:
         # Check the python and mypy paths before looking for third-party stuff
 
         res = self.check_base_dirs(id, components,
-                                   self.find_lib_path_dirs(dir_chain, self.python_mypy_path),
+                                   self.find_lib_path_dirs(components, dir_chain, self.python_mypy_path),
                                    near_misses)
         if res is not None:
             return res
@@ -238,7 +243,7 @@ class FindModuleCache:
 #        print('LOL GOT HERE', len(components))
         candidate_base_dirs = \
             third_party_stubs_dirs + third_party_inline_dirs + \
-            list(self.find_lib_path_dirs(dir_chain, self.search_paths.typeshed_path))
+            list(self.find_lib_path_dirs(components, dir_chain, self.search_paths.typeshed_path))
 
 
         # XXX

@@ -53,6 +53,7 @@ class FileSystemCache:
         self.scandir_cache = {}  # type: Dict[str, Dict[str, SimpleDirEntry]]
         self.scandir_error_cache = {}  # type: Dict[str, OSError]
         self.isfile_case_cache = {}  # type: Dict[str, bool]
+        self.isdir_cache = {}  # type: Dict[str, bool]
         self.read_cache = {}  # type: Dict[str, bytes]
         self.read_error_cache = {}  # type: Dict[str, Exception]
         self.hash_cache = {}  # type: Dict[str, str]
@@ -203,14 +204,15 @@ class FileSystemCache:
             res = False
         else:
             try:
-                names = self.listdir(head)
-                res = tail in names and self.isfile(path)
+                contents = self.scandir(head)
+                entry = contents.get(tail)
+                res = entry is not None and entry.is_file
             except OSError:
                 res = False
         self.isfile_case_cache[path] = res
         return res
 
-    def isdir(self, path: str) -> bool:
+    def _isdir(self, path: str) -> bool:
         base, end = os.path.split(path)
         try:
             contents = self.scandir(base)
@@ -218,6 +220,11 @@ class FileSystemCache:
             return False
         entry = contents.get(end)
         return entry is not None and entry.is_dir
+
+    def isdir(self, path: str) -> bool:
+        if path not in self.isdir_cache:
+            self.isdir_cache[path] = self._isdir(path)
+        return self.isdir_cache[path]
 
     def exists(self, path: str) -> bool:
         try:
