@@ -131,7 +131,6 @@ class CheckerPluginInterface:
 
     msg = None  # type: MessageBuilder
     options = None  # type: Options
-    path = None  # type: str
 
     @abstractmethod
     def fail(self, msg: str, ctx: Context) -> None:

@@ -94,7 +94,7 @@ DeferredNode = NamedTuple(
 # Same as above, but for fine-grained mode targets. Only top-level functions/methods
 # and module top levels are allowed as such.
 FineGrainedDeferredNode = NamedTuple(
-    'FineGrainedDeferredNode',
+    'FineDeferredNode',
     [
         ('node', FineGrainedDeferredNodeType),
         ('context_type_name', Optional[str]),
