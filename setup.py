@@ -115,6 +115,7 @@ if USE_MYPYC:
 
     # Fix the paths to be full
     mypyc_targets = [os.path.join('mypy', x) for x in mypyc_targets]
+    print("TARGETS:", mypyc_targets)
 
     # This bit is super unfortunate: we want to use the mypy packaged
     # with mypyc. It will arrange for the path to be setup so it can
