@@ -128,11 +128,11 @@ def parse_config_file(options: Options, filename: Optional[str],
             prefix = '%s: [%s]: ' % (file_read, name)
             updates, report_dirs = parse_section(prefix, options, section, stderr)
             if report_dirs:
-                print("%s: Per-module sections should not specify reports (%s)" %
+                print("%sPer-module sections should not specify reports (%s)" %
                       (prefix, ', '.join(s + '_report' for s in sorted(report_dirs))),
                       file=stderr)
             if set(updates) - PER_MODULE_OPTIONS:
-                print("%s: Per-module sections should only specify per-module flags (%s)" %
+                print("%sPer-module sections should only specify per-module flags (%s)" %
                       (prefix, ', '.join(sorted(set(updates) - PER_MODULE_OPTIONS))),
                       file=stderr)
                 updates = {k: v for k, v in updates.items() if k in PER_MODULE_OPTIONS}
@@ -145,7 +145,7 @@ def parse_config_file(options: Options, filename: Optional[str],
 
                 if (any(c in glob for c in '?[]!') or
                         any('*' in x and x != '*' for x in glob.split('.'))):
-                    print("%s: Patterns must be fully-qualified module names, optionally "
+                    print("%sPatterns must be fully-qualified module names, optionally "
                           "with '*' in some components (e.g spam.*.eggs.*)"
                           % prefix,
                           file=stderr)
@@ -199,7 +199,7 @@ def parse_section(prefix: str, template: Options,
                     print("%s%s: %s" % (prefix, key, err), file=stderr)
                     continue
             else:
-                print("%s: Don't know what type %s should have" % (prefix, key), file=stderr)
+                print("%sDon't know what type %s should have" % (prefix, key), file=stderr)
                 continue
         except ValueError as err:
             print("%s%s: %s" % (prefix, key, err), file=stderr)
